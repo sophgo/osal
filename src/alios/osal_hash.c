@@ -306,9 +306,7 @@ int osal_hash_size(osal_hash *hash)
 	}
 	Hashmap *map = (Hashmap *)hash->hash;
 
-	size_t bucketCount = map->bucketCount;
-
-	return bucketCount * 3 / 4;
+	return (int)map->size;
 }
 
 void osal_hash_for_each(osal_hash *hash, hash_callback cb, void *context)
