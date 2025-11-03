@@ -73,6 +73,14 @@ void osal_panic(const char *fmt, const char *fun, int line, const char *cond);
  * linux alios rt_thread.
  */
 void osal_dump_stack(void);
+/**
+ * @ingroup osal_debug
+ * @brief Choose printk function according to the configuration.
+ *
+ * @par Support System:
+ * linux alios rt_thread.
+ */
+void osal_printk_auto(const char *fmt, ...) __attribute__((__format__ (__printf__, 1, 2)));
 
 #ifdef __cplusplus
 #if __cplusplus

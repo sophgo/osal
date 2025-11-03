@@ -154,4 +154,6 @@ osal_addr_test
 ```
 
 
+## 许可证
 
+本项目基于 [GPL-2.0](LICENSE) 许可证开源.

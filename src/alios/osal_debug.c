@@ -57,3 +57,25 @@ void osal_printk(const char *fmt, ...)
     vprintf(fmt, args);
     va_end(args);
 }
+
+#if CONFIG_LOG_TO_DMESG
+#include "dmesg.h"
+#endif
+void osal_printk_auto(const char *fmt, ...)
+{
+    va_list args;
+
+    if (fmt == NULL) {
+        osal_log("parameter invalid! caller: %p\n", __builtin_return_address(0));
+        return;
+    }
+
+    va_start(args, fmt);
+#if CONFIG_LOG_TO_DMESG
+    vprintk_func(fmt, args);
+#else
+    vprintf(fmt, args);
+#endif
+    va_end(args);
+}
+

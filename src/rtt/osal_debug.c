@@ -68,4 +68,19 @@ void osal_printf(const char *fmt, ...)
 
 	rt_kprintf("%s", buffer);
 }
-// EXPORT_SYMBOL(osal_printf);
+
+void osal_printk_auto(const char *fmt, ...)
+{
+	va_list args;
+	char buffer[256];
+
+	if (fmt == NULL) {
+		return;
+	}
+
+	va_start(args, fmt);
+	rt_vsnprintf(buffer, sizeof(buffer), fmt, args);
+	va_end(args);
+
+	rt_kprintf("%s", buffer);
+}
