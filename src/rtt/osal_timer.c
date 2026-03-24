@@ -211,6 +211,25 @@ void osal_gettimeofday(osal_timeval *tv)
 }
 // EXPORT_SYMBOL(osal_gettimeofday);
 
+long osal_timeval_sub(osal_timeval end, osal_timeval start)
+{
+	long ts_us;
+	long ts_s;
+
+	ts_s = end.tv_sec - start.tv_sec;
+
+	if (end.tv_usec < start.tv_usec) {
+		ts_us = 1000000 + end.tv_usec - start.tv_usec;
+		ts_s--;
+	} else {
+		ts_us = end.tv_usec - start.tv_usec;
+	}
+
+	ts_us += 1000000 * ts_s;
+
+	return ts_us;
+}
+
 //Linux milliseconds:jiffies = 4 : 1
 unsigned long osal_msecs_to_jiffies(const unsigned int m)
 {

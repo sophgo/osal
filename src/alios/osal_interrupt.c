@@ -4,6 +4,7 @@
 #include <string.h>
 #include "osal.h"
 #include "osal_inner.h"
+#include "k_api.h"
 
 #define MAX_IRQ_NAME_LEN 32
 
@@ -69,106 +70,100 @@ void osal_irq_disable(unsigned int irq)
     csi_irq_disable(irq);
 }
 
-typedef struct {
-    void (*origin_handler)(unsigned long);
-    unsigned long origin_data;
-    aos_mutex_t lock;
-} tasklet_adapter;
+/*
+ * Tasklet Implementation Notes for AliOS:
+ *
+ * In Linux, tasklets are a bottom-half mechanism that runs in softirq context,
+ * executing soon after the hardware IRQ handler completes. They provide deferred
+ * interrupt processing with minimal latency.
+ *
+ * AliOS does not have a direct softirq equivalent. This implementation uses
+ * aos_work_t (work queue) as the closest approximation:
+ *
+ * - aos_work_t: Executes in a dedicated work thread context, scheduled by the
+ *               kernel scheduler. Lower latency than timers, but not as immediate
+ *               as true softirq. Can sleep/block if needed.
+ *
+ * Alternative considered but NOT used:
+ * - aos_timer: Would introduce a fixed 1-tick delay, which violates tasklet's
+ *              "execute as soon as possible" semantic.
+ *
+ * Trade-offs:
+ * + Work queue provides reasonably quick execution after IRQ
+ * + Maintains RTOS thread context (can use mutexes, sleep, etc.)
+ * - Slightly higher latency than true softirq (subject to thread scheduling)
+ * - Not running in atomic context like Linux tasklets
+ */
 
-typedef struct {
-    aos_timer_t *timer;
-    tasklet_adapter *adapter;
-} tasklet_internal;
-
-static void aos_tasklet_adapter(void *timer_hdl, void *arg)
+static void osal_tasklet_work_handler(void *arg)
 {
-    tasklet_adapter *adapter = (tasklet_adapter*)arg;
-    aos_mutex_lock(&adapter->lock, AOS_WAIT_FOREVER);
-
-    if (adapter->origin_handler) {
-        adapter->origin_handler(adapter->origin_data);
+    osal_tasklet *tasklet = (osal_tasklet *)arg;
+    if (tasklet && tasklet->handler) {
+        tasklet->handler(tasklet->data);
     }
-
-    aos_mutex_unlock(&adapter->lock);
 }
 
 int osal_tasklet_init(osal_tasklet *tasklet)
 {
     if (tasklet == NULL || tasklet->tasklet != NULL) {
-        osal_log("init tasklet is NULL ! \n");
+        osal_log("parameter invalid! caller: %p\n", __builtin_return_address(0));
         return OSAL_FAILURE;
     }
 
-    tasklet_internal *internal = aos_malloc(sizeof(tasklet_internal));
-    if (!internal) return OSAL_FAILURE;
-
-    tasklet_adapter *adapter = aos_malloc(sizeof(tasklet_adapter));
-    if (!adapter) {
-        aos_free(internal);
+    if (aos_work_init((aos_work_t *)&(tasklet->tasklet), osal_tasklet_work_handler, tasklet, 0)) {
+        osal_log("osal_tasklet_init failed!\n");
         return OSAL_FAILURE;
     }
 
-    adapter->origin_handler = tasklet->handler;
-    adapter->origin_data = tasklet->data;
-    aos_mutex_new(&adapter->lock);
-
-    aos_timer_t *timer_ptr = aos_malloc(sizeof(aos_timer_t));
-    if (!timer_ptr) {
-        aos_mutex_free(&adapter->lock);
-        aos_free(adapter);
-        aos_free(internal);
-        return OSAL_FAILURE;
-    }
-
-    if (aos_timer_new(timer_ptr, aos_tasklet_adapter, adapter, 1, false) != 0) {
-        aos_mutex_free(&adapter->lock);
-        aos_free(adapter);
-        aos_free(timer_ptr);
-        aos_free(internal);
-        return OSAL_FAILURE;
-    }
-
-    internal->timer = timer_ptr;
-    internal->adapter = adapter;
-
-    tasklet->tasklet = internal;
     return OSAL_SUCCESS;
 }
 
 int osal_tasklet_update(osal_tasklet *tasklet)
 {
-    if (!tasklet || !tasklet->tasklet) return OSAL_FAILURE;
-    tasklet_internal *internal = (tasklet_internal *)tasklet->tasklet;
-    tasklet_adapter *adapter = internal->adapter;
-
-    aos_mutex_lock(&adapter->lock, AOS_WAIT_FOREVER);
-    adapter->origin_handler = tasklet->handler;
-    adapter->origin_data = tasklet->data;
-    aos_mutex_unlock(&adapter->lock);
+    if (tasklet == NULL || tasklet->tasklet == NULL) {
+        osal_log("parameter invalid! caller: %p\n", __builtin_return_address(0));
+        return OSAL_FAILURE;
+    }
 
     return OSAL_SUCCESS;
 }
 
 int osal_tasklet_schedule(osal_tasklet *tasklet)
 {
-    if (!tasklet || !tasklet->tasklet) return OSAL_FAILURE;
-    tasklet_internal *internal = (tasklet_internal *)tasklet->tasklet;
-    aos_timer_start(internal->timer);
+    CPSR_ALLOC();
+    kwork_t *kwork = NULL;
+
+    if (tasklet == NULL || tasklet->tasklet == NULL) {
+        osal_log("parameter invalid! caller: %p\n", __builtin_return_address(0));
+        return OSAL_FAILURE;
+    }
+
+    kwork = (kwork_t *)(tasklet->tasklet);
+
+    RHINO_CRITICAL_ENTER();
+    if (g_workqueue_default.work_current == kwork ||
+        kwork->work_exit == 1) {
+        RHINO_CRITICAL_EXIT();
+        return OSAL_SUCCESS;
+    }
+    RHINO_CRITICAL_EXIT();
+
+    if (aos_work_sched((aos_work_t *)&(tasklet->tasklet))) {
+        osal_log("osal_tasklet_schedule failed! caller: %p\n", __builtin_return_address(0));
+        return OSAL_FAILURE;
+    }
+
     return OSAL_SUCCESS;
 }
 
 int osal_tasklet_kill(osal_tasklet *tasklet)
 {
-    if (!tasklet || !tasklet->tasklet) return OSAL_FAILURE;
-    tasklet_internal *internal = (tasklet_internal *)tasklet->tasklet;
-    aos_timer_stop(internal->timer);
-    aos_timer_free(internal->timer);
-    aos_free(internal->timer);
+    if (tasklet == NULL || tasklet->tasklet == NULL) {
+        osal_log("parameter invalid! caller: %p\n", __builtin_return_address(0));
+        return OSAL_FAILURE;
+    }
 
-    aos_mutex_free(&internal->adapter->lock);
-    aos_free(internal->adapter);
-
-    aos_free(internal);
+    aos_work_destroy((aos_work_t *)&(tasklet->tasklet));
     tasklet->tasklet = NULL;
     return OSAL_SUCCESS;
 }

@@ -256,7 +256,20 @@ unsigned long long osal_sched_clock(void)
 }
 EXPORT_SYMBOL(osal_sched_clock);
 
-void osal_gettimeofday(osal_timeval *tv)
+void osal_time_get_ts64(osal_timeval *tv)
+{
+    struct timespec64 now;
+    if (tv == NULL) {
+        osal_log("parameter invalid! caller: %p\n", __builtin_return_address(0));
+        return;
+    }
+    ktime_get_ts64(&now);
+    tv->tv_sec = now.tv_sec;
+    tv->tv_usec = now.tv_nsec / NS_TO_USEC;
+}
+EXPORT_SYMBOL(osal_time_get_ts64);
+
+void osal_time_get_real_ts64(osal_timeval *tv)
 {
     struct timespec64 now;
     if (tv == NULL) {
@@ -267,7 +280,66 @@ void osal_gettimeofday(osal_timeval *tv)
     tv->tv_sec = now.tv_sec;
     tv->tv_usec = now.tv_nsec / NS_TO_USEC;
 }
+EXPORT_SYMBOL(osal_time_get_real_ts64);
+
+void osal_time_get_boottime_ts64(osal_timeval *tv)
+{
+    struct timespec64 now;
+    if (tv == NULL) {
+        osal_log("parameter invalid! caller: %p\n", __builtin_return_address(0));
+        return;
+    }
+    ktime_get_boottime_ts64(&now);
+    tv->tv_sec = now.tv_sec;
+    tv->tv_usec = now.tv_nsec / NS_TO_USEC;
+}
+EXPORT_SYMBOL(osal_time_get_boottime_ts64);
+
+void osal_time_get_raw_ts64(osal_timeval *tv)
+{
+    struct timespec64 now;
+    if (tv == NULL) {
+        osal_log("parameter invalid! caller: %p\n", __builtin_return_address(0));
+        return;
+    }
+    ktime_get_raw_ts64(&now);
+    tv->tv_sec = now.tv_sec;
+    tv->tv_usec = now.tv_nsec / NS_TO_USEC;
+}
+EXPORT_SYMBOL(osal_time_get_raw_ts64);
+
+void osal_gettimeofday(osal_timeval *tv)
+{
+    struct timespec64 now;
+    if (tv == NULL) {
+        osal_log("parameter invalid! caller: %p\n", __builtin_return_address(0));
+        return;
+    }
+    ktime_get_raw_ts64(&now);
+    tv->tv_sec = now.tv_sec;
+    tv->tv_usec = now.tv_nsec / NS_TO_USEC;
+}
 EXPORT_SYMBOL(osal_gettimeofday);
+
+long osal_timeval_sub(osal_timeval end, osal_timeval start)
+{
+	long ts_us;
+	long ts_s;
+
+	ts_s = end.tv_sec - start.tv_sec;
+
+	if (end.tv_usec < start.tv_usec) {
+		ts_us = 1000000 + end.tv_usec - start.tv_usec;
+		ts_s--;
+	} else {
+		ts_us = end.tv_usec - start.tv_usec;
+	}
+
+	ts_us += 1000000 * ts_s;
+
+	return ts_us;
+}
+EXPORT_SYMBOL(osal_timeval_sub);
 
 unsigned long osal_msecs_to_jiffies(const unsigned int m)
 {

@@ -140,6 +140,25 @@ void osal_gettimeofday(osal_timeval *tv)
     tv->tv_usec = time_us % US_TO_SEC;
 }
 
+long osal_timeval_sub(osal_timeval end, osal_timeval start)
+{
+	long ts_us;
+	long ts_s;
+
+	ts_s = end.tv_sec - start.tv_sec;
+
+	if (end.tv_usec < start.tv_usec) {
+		ts_us = 1000000 + end.tv_usec - start.tv_usec;
+		ts_s--;
+	} else {
+		ts_us = end.tv_usec - start.tv_usec;
+	}
+
+	ts_us += 1000000 * ts_s;
+
+	return ts_us;
+}
+
 unsigned int osal_jiffies_to_msecs(const unsigned int n)
 {
     return aos_kernel_tick2ms(n);

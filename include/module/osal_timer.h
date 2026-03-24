@@ -320,6 +320,79 @@ int osal_hrtimer_start(osal_hrtimer *hrtimer);
  */
 int osal_hrtimer_destroy(osal_hrtimer *hrtimer);
 
+/**
+ * @ingroup osal_timer
+ * @brief Obtaining the current system monotonic time
+ *
+ * @par Description:
+ * Obtaining the current system monotonic time.
+ *
+ * @param tv [out] Obtained Current System monotonic Time.
+ *
+ * @par Support System:
+ * linux
+ */
+void osal_time_get_ts64(osal_timeval *tv);
+
+/**
+ * @ingroup osal_timer
+ * @brief Obtaining the current system real time
+ *
+ * @par Description:
+ * Obtaining the current system v time.
+ *
+ * @param tv [out] Obtained Current System real Time.
+ *
+ * @par Support System:
+ * linux
+ */
+void osal_time_get_real_ts64(osal_timeval *tv);
+
+/**
+ * @ingroup osal_timer
+ * @brief Obtaining the Current System boottime Time.
+ *
+ * @par Description:
+ * Obtaining the Current System boottime Time.
+ *
+ * @param tv [out] Obtained Current System boottime Time.
+ *
+ * @par Support System:
+ * linux
+ */
+void osal_time_get_boottime_ts64(osal_timeval *tv);
+
+/**
+ * @ingroup osal_timer
+ * @brief Obtaining the Current System monotonic-raw Time.
+ *
+ * @par Description:
+ * Obtaining the Current System monotonic-raw Time.
+ *
+ * @param tv [out] Obtained Current System monotonic-raw Time.
+ *
+ * @par Support System:
+ * linux
+ */
+void osal_time_get_raw_ts64(osal_timeval *tv);
+
+/**
+ * @ingroup osal_timer
+ * @brief Obtain two time differences.
+ *
+ * @par Description:
+ * Obtain two time differences.
+ *
+ * @param end [in] End Time.
+ * @param start [in] Start Time.
+ *
+ * @return Time differences.
+ *
+ * @par Support System:
+ * linux
+ */
+long osal_timeval_sub(osal_timeval end, osal_timeval start);
+
 #ifdef __cplusplus
 #if __cplusplus
 }
