@@ -43,3 +43,6 @@ void osal_driver_exit(void)
 
     return;
 }
+
+ALIOS_MODULE_REGISTER(osal_driver_init);
+
